@@ -37,8 +37,6 @@
             "repeat": "Repeat"
         },
         "timestamp": "timestamp",
-        "string": "string",
-        "blank": "blank",
         "none": "none",
         "interval": "interval",
         "interval-time": "interval between times",
@@ -47,6 +45,7 @@
         "minutes": "minutes",
         "hours": "hours",
         "between": "between",
+        "previous": "previous value",
         "at": "at",
         "and": "and",
         "every": "every",
@@ -138,7 +137,8 @@
     "template": {
         "label": {
             "template": "Template",
-            "property": "Property"
+            "property": "Property",
+            "format": "Syntax Highlight"
         },
         "templatevalue": "This is the payload: {{payload}} !"
     },
@@ -398,7 +398,8 @@
         },
         "tip": {
             "in": "Tip: Make sure your firewall will allow the data in.",
-            "out": "Tip: leave address and port blank if you want to set using <b>msg.ip</b> and <b>msg.port</b>."
+            "out": "Tip: leave address and port blank if you want to set using <b>msg.ip</b> and <b>msg.port</b>.",
+            "port": "Ports already in use: "
         },
         "status": {
             "listener-at": "udp listener at __host__:__port__",
@@ -412,12 +413,13 @@
         },
         "errors": {
             "access-error": "UDP access error, you may need root access for ports below 1024",
-            "error": "error: __error_",
+            "error": "error: __error__",
             "bad-mcaddress": "Bad Multicast Address",
             "interface": "Must be ip address of the required interface",
             "ip-notset": "udp: ip address not set",
             "port-notset": "udp: port not set",
-            "port-invalid": "udp: port number not valid"
+            "port-invalid": "udp: port number not valid",
+            "alreadyused": "udp: port already in use"
         }
     },
     "switch": {
@@ -459,7 +461,8 @@
             "replace": "Replace with"
         },
         "errors": {
-            "invalid-from": "Invalid 'from' property: __error__"
+            "invalid-from": "Invalid 'from' property: __error__",
+            "invalid-json": "Invalid 'to' JSON property"
         }
     },
     "range": {
@@ -531,7 +534,8 @@
         },
         "output": {
             "html": "the html content of the elements",
-            "text": "only the text content of the elements"
+            "text": "only the text content of the elements",
+            "attr": "an object of any attributes of the elements"
         },
         "format": {
             "single": "as a single message containing an array",
@@ -567,6 +571,7 @@
             "initpin": "Initialise pin state?",
             "button": "Button",
             "pimouse": "Pi Mouse",
+            "pikeyboard": "Pi Keyboard",
             "left": "Left",
             "right": "Right",
             "middle": "Middle"

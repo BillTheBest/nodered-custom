@@ -6,10 +6,20 @@ http://nodered.org
 
 red/api/theme.js
 
-## Contributing
+function serveFile(app,baseUrl,file) {
 
-Before raising a pull-request, please read our
-[contributing guide](https://github.com/node-red/node-red/blob/master/CONTRIBUTING.md).
+  try {
+    var url = baseUrl+path.basename(file);
+    //console.log(url,"->",file);
+    app.get(url,function(req, res) {
+      res.sendFile(file);
+    });
+    return "../public"+url;
+  } catch(err) {
+    //TODO: log filenotfound
+    return null;
+  }
+}
 
 ## Authors
 

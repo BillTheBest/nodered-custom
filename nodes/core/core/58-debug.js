@@ -84,7 +84,7 @@ module.exports = function(RED) {
         } else if (msg.msg instanceof Buffer) {
             msg.format = "buffer ["+msg.msg.length+"]";
             msg.msg = msg.msg.toString('hex');
-        } else if (typeof msg.msg === 'object') {
+        } else if (msg.msg && typeof msg.msg === 'object') {
             var seen = [];
             msg.format = msg.msg.constructor.name || "Object";
             var isArray = util.isArray(msg.msg);
@@ -124,7 +124,6 @@ module.exports = function(RED) {
         if (msg.msg.length > debuglength) {
             msg.msg = msg.msg.substr(0,debuglength) +" ....";
         }
-
         RED.comms.publish("debug",msg);
     }
 

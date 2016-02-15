@@ -90,14 +90,49 @@ module.exports = function(RED) {
                 }
             },
             context: {
-                global:RED.settings.functionGlobalContext || {}
+                set: function() {
+                    node.context().set.apply(node,arguments);
+                },
+                get: function() {
+                    return node.context().get.apply(node,arguments);
+                },
+                get global() {
+                    return node.context().global;
+                },
+                get flow() {
+                    return node.context().flow;
+                }
             },
-            setTimeout: function (func,delay) {
-                var timerId = setTimeout(function() {
+            flow: {
+                set: function() {
+                    node.context().flow.set.apply(node,arguments);
+                },
+                get: function() {
+                    return node.context().flow.get.apply(node,arguments);
+                }
+            },
+            global: {
+                set: function() {
+                    node.context().global.set.apply(node,arguments);
+                },
+                get: function() {
+                    return node.context().global.get.apply(node,arguments);
+                }
+            },
+            setTimeout: function () {
+                var func = arguments[0];
+                var timerId;
+                arguments[0] = function() {
                     sandbox.clearTimeout(timerId);
-                    func();
-                },delay);
+                    try {
+                        func.apply(this,arguments);
+                    } catch(err) {
+                        node.error(err,{});
+                    }
+                };
+                timerId = setTimeout.apply(this,arguments);
                 node.outstandingTimers.push(timerId);
+                return timerId;
             },
             clearTimeout: function(id) {
                 clearTimeout(id);
@@ -106,9 +141,19 @@ module.exports = function(RED) {
                     node.outstandingTimers.splice(index,1);
                 }
             },
-            setInterval: function(func,delay) {
-                var timerId = setInterval(func,delay);
+            setInterval: function() {
+                var func = arguments[0];
+                var timerId;
+                arguments[0] = function() {
+                    try {
+                        func.apply(this,arguments);
+                    } catch(err) {
+                        node.error(err,{});
+                    }
+                };
+                timerId = setInterval.apply(this,arguments);
                 node.outstandingIntervals.push(timerId);
+                return timerId;
             },
             clearInterval: function(id) {
                 clearInterval(id);

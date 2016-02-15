@@ -156,11 +156,13 @@ var RED = (function() {
     function loadEditor() {
         RED.menu.init({id:"btn-sidemenu",
             options: [
-                {id:"menu-item-sidebar-menu",label:RED._("menu.label.sidebar.sidebar"),options:[
-                    {id:"menu-item-sidebar",label:RED._("menu.label.sidebar.show"),toggle:true,onselect:RED.sidebar.toggleSidebar, selected: true},
-                    null
+                {id:"menu-item-view-menu",label:RED._("menu.label.view.view"),options:[
+                    {id:"menu-item-view-show-grid",label:RED._("menu.label.view.showGrid"),toggle:true,onselect:RED.view.toggleShowGrid},
+                    {id:"menu-item-view-snap-grid",label:RED._("menu.label.view.snapGrid"),toggle:true,onselect:RED.view.toggleSnapGrid},
+                    {id:"menu-item-status",label:RED._("menu.label.displayStatus"),toggle:true,onselect:toggleStatus, selected: true},
+                    null,
+                    {id:"menu-item-sidebar",label:RED._("menu.label.sidebar.show"),toggle:true,onselect:RED.sidebar.toggleSidebar, selected: true}
                 ]},
-                {id:"menu-item-status",label:RED._("menu.label.displayStatus"),toggle:true,onselect:toggleStatus, selected: true},
                 null,
                 {id:"menu-item-import",label:RED._("menu.label.import"),options:[
                     {id:"menu-item-import-clipboard",label:RED._("menu.label.clipboard"),onselect:RED.clipboard.import},
@@ -171,23 +173,24 @@ var RED = (function() {
                     {id:"menu-item-export-library",label:RED._("menu.label.library"),disabled:true,onselect:RED.library.export}
                 ]},
                 null,
-                {id:"menu-item-subflow",label:RED._("menu.label.subflows"), options: [
-                    {id:"menu-item-subflow-create",label:RED._("menu.label.createSubflow"),onselect:RED.subflow.createSubflow},
-                    {id:"menu-item-subflow-convert",label:RED._("menu.label.selectionToSubflow"),disabled:true,onselect:RED.subflow.convertToSubflow},
-                ]},
-                null,
+                {id:"menu-item-config-nodes",label:RED._("menu.label.displayConfig"),onselect:function(){}},
                 {id:"menu-item-workspace",label:RED._("menu.label.flows"),options:[
                     {id:"menu-item-workspace-add",label:RED._("menu.label.add"),onselect:RED.workspaces.add},
                     {id:"menu-item-workspace-edit",label:RED._("menu.label.rename"),onselect:RED.workspaces.edit},
                     {id:"menu-item-workspace-delete",label:RED._("menu.label.delete"),onselect:RED.workspaces.remove},
                     null
                 ]},
+                {id:"menu-item-subflow",label:RED._("menu.label.subflows"), options: [
+                    {id:"menu-item-subflow-create",label:RED._("menu.label.createSubflow"),onselect:RED.subflow.createSubflow},
+                    {id:"menu-item-subflow-convert",label:RED._("menu.label.selectionToSubflow"),disabled:true,onselect:RED.subflow.convertToSubflow},
+                ]},
                 null,
                 {id:"menu-item-keyboard-shortcuts",label:RED._("menu.label.keyboardShortcuts"),onselect:RED.keyboard.showHelp},
                 {id:"menu-item-help",
                     label: RED.settings.theme("menu.menu-item-help.label","Node-RED Website"),
                     href: RED.settings.theme("menu.menu-item-help.url","http://nodered.org/docs")
-                }
+                },
+                {id:"menu-item-node-red-version", label:"v"+RED.settings.version}
             ]
         });
 
@@ -339,9 +342,9 @@ RED.i18n = (function() {
 
 
 RED.settings = (function () {
-    
+
     var loadedSettings = {};
-        
+
     var hasLocalStorage = function () {
         try {
             return 'localStorage' in window && window['localStorage'] !== null;
@@ -397,7 +400,7 @@ RED.settings = (function () {
             RED.settings.set("auth-tokens",{access_token: accessToken});
             window.location.search = "";
         }
-        
+
         $.ajaxSetup({
             beforeSend: function(jqXHR,settings) {
                 // Only attach auth header for requests to relative paths
@@ -412,7 +415,7 @@ RED.settings = (function () {
 
         load(done);
     }
-    
+
     var load = function(done) {
         $.ajax({
             headers: {
@@ -464,7 +467,7 @@ RED.settings = (function () {
         set: set,
         get: get,
         remove: remove,
-        
+
         theme: theme
     }
 })
@@ -968,6 +971,12 @@ RED.nodes = (function() {
         if (n._def.category == "config") {
             configNodes[n.id] = n;
         } else {
+            n.ports = [];
+            if (n.outputs) {
+                for (var i=0;i<n.outputs;i++) {
+                    n.ports.push(i);
+                }
+            }
             n.dirty = true;
             var updatedConfigNode = false;
             for (var d in n._def.defaults) {
@@ -1837,7 +1846,7 @@ RED.nodes = (function() {
     };
 })();
 ;/**
- * Copyright 2013, 2015 IBM Corp.
+ * Copyright 2013, 2016 IBM Corp.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -1918,6 +1927,12 @@ RED.history = (function() {
                             }
                         }
                     }
+                    if (ev.removedLinks) {
+                        for (i=0;i<ev.removedLinks.length;i++) {
+                            RED.nodes.addLink(ev.removedLinks[i]);
+                        }
+                    }
+
                 } else if (ev.t == "delete") {
                     if (ev.workspaces) {
                         for (i=0;i<ev.workspaces.length;i++) {
@@ -2005,6 +2020,17 @@ RED.history = (function() {
                         n.n.x = n.ox;
                         n.n.y = n.oy;
                         n.n.dirty = true;
+                    }
+                    // A move could have caused a link splice
+                    if (ev.links) {
+                        for (i=0;i<ev.links.length;i++) {
+                            RED.nodes.removeLink(ev.links[i]);
+                        }
+                    }
+                    if (ev.removedLinks) {
+                        for (i=0;i<ev.removedLinks.length;i++) {
+                            RED.nodes.addLink(ev.removedLinks[i]);
+                        }
                     }
                 } else if (ev.t == "edit") {
                     for (i in ev.changes) {
@@ -2103,6 +2129,7 @@ RED.history = (function() {
                 RED.view.redraw(true);
                 RED.palette.refresh();
                 RED.workspaces.refresh();
+                RED.sidebar.config.refresh();
             }
         }
     }
@@ -2128,7 +2155,7 @@ RED.validators = {
     regex: function(re){return function(v) { return re.test(v);}}
 };
 ;/**
- * Copyright 2015 IBM Corp.
+ * Copyright 2016 IBM Corp.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -2337,13 +2364,13 @@ RED.deploy = (function() {
                         .html("<li>"+invalidNodes.map(function(A) { return (A.tab?"["+A.tab+"] ":"")+A.label+" ("+A.type+")"}).join("</li><li>")+"</li>");
 
                 } else if (hasUnusedConfig && !ignoreDeployWarnings.unusedConfig) {
-                    showWarning = true;
-                    $( "#node-dialog-confirm-deploy-type" ).val("unusedConfig");
-                    $( "#node-dialog-confirm-deploy-unused" ).show();
-
-                    unusedConfigNodes.sort(sortNodeInfo);
-                    $( "#node-dialog-confirm-deploy-unused-list" )
-                        .html("<li>"+unusedConfigNodes.map(function(A) { return (A.tab?"["+A.tab+"] ":"")+A.label+" ("+A.type+")"}).join("</li><li>")+"</li>");
+                    // showWarning = true;
+                    // $( "#node-dialog-confirm-deploy-type" ).val("unusedConfig");
+                    // $( "#node-dialog-confirm-deploy-unused" ).show();
+                    //
+                    // unusedConfigNodes.sort(sortNodeInfo);
+                    // $( "#node-dialog-confirm-deploy-unused-list" )
+                    //     .html("<li>"+unusedConfigNodes.map(function(A) { return (A.tab?"["+A.tab+"] ":"")+A.label+" ("+A.type+")"}).join("</li><li>")+"</li>");
                 }
                 if (showWarning) {
                     $( "#node-dialog-confirm-deploy-hide" ).prop("checked",false);
@@ -2370,7 +2397,13 @@ RED.deploy = (function() {
                     "Node-RED-Deployment-Type":deploymentType
                 }
             }).done(function(data,textStatus,xhr) {
-                RED.notify(RED._("deploy.successfulDeploy"),"success");
+                if (hasUnusedConfig) {
+                    RED.notify(
+                    '<p>'+RED._("deploy.successfulDeploy")+'</p>'+
+                    '<p>'+RED._("deploy.unusedConfigNodes")+' <a href="#" onclick="RED.sidebar.config.show(true); return false;">'+RED._("deploy.unusedConfigNodesLink")+'</a></p>',"success",false,6000);
+                } else {
+                    RED.notify(RED._("deploy.successfulDeploy"),"success");
+                }
                 RED.nodes.eachNode(function(node) {
                     if (node.changed) {
                         node.dirty = true;
@@ -3063,7 +3096,6 @@ RED.workspaces = (function() {
             var tabId = RED.nodes.id();
             do {
                 workspaceIndex += 1;
-                //TODO: nls of Sheet
             } while($("#workspace-tabs a[title='"+RED._('workspace.defaultName',{number:workspaceIndex})+"']").size() !== 0);
 
             ws = {type:"tab",id:tabId,label:RED._('workspace.defaultName',{number:workspaceIndex})};
@@ -3090,6 +3122,7 @@ RED.workspaces = (function() {
             historyEvent.workspaces = [ws];
             RED.history.push(historyEvent);
             RED.nodes.dirty(true);
+            RED.sidebar.config.refresh();
         } else {
             $( "#node-dialog-delete-workspace" ).dialog('option','workspace',ws);
             $( "#node-dialog-delete-workspace-content" ).text(RED._("workspace.delete",{label:ws.label}));
@@ -3176,8 +3209,8 @@ RED.workspaces = (function() {
                         if (workspace.label != label) {
                             workspace_tabs.renameTab(workspace.id,label);
                             RED.nodes.dirty(true);
+                            RED.sidebar.config.refresh();
                             $("#menu-item-workspace-menu-"+workspace.id.replace(".","-")).text(label);
-                            // TODO: update entry in menu
                         }
                         $( this ).dialog( "close" );
                     }
@@ -3291,7 +3324,7 @@ RED.workspaces = (function() {
     }
 })();
 ;/**
- * Copyright 2013, 2015 IBM Corp.
+ * Copyright 2013, 2016 IBM Corp.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -3323,6 +3356,12 @@ RED.view = (function() {
 
     var workspaceScrollPositions = {};
 
+    var gridSize = 20;
+    var snapGrid = false;
+
+    var activeSpliceLink;
+    var spliceActive = false;
+    var spliceTimer;
 
     var activeSubflow = null;
     var activeNodes = [];
@@ -3488,40 +3527,54 @@ RED.view = (function() {
         .attr('height', space_height)
         .attr('fill','#fff');
 
-    //var gridScale = d3.scale.linear().range([0,2000]).domain([0,2000]);
-    //var grid = vis.append('g');
-    //
-    //grid.selectAll("line.horizontal").data(gridScale.ticks(100)).enter()
-    //    .append("line")
-    //        .attr(
-    //        {
-    //            "class":"horizontal",
-    //            "x1" : 0,
-    //            "x2" : 2000,
-    //            "y1" : function(d){ return gridScale(d);},
-    //            "y2" : function(d){ return gridScale(d);},
-    //            "fill" : "none",
-    //            "shape-rendering" : "crispEdges",
-    //            "stroke" : "#eee",
-    //            "stroke-width" : "1px"
-    //        });
-    //grid.selectAll("line.vertical").data(gridScale.ticks(100)).enter()
-    //    .append("line")
-    //        .attr(
-    //        {
-    //            "class":"vertical",
-    //            "y1" : 0,
-    //            "y2" : 2000,
-    //            "x1" : function(d){ return gridScale(d);},
-    //            "x2" : function(d){ return gridScale(d);},
-    //            "fill" : "none",
-    //            "shape-rendering" : "crispEdges",
-    //            "stroke" : "#eee",
-    //            "stroke-width" : "1px"
-    //        });
+    var gridScale = d3.scale.linear().range([0,space_width]).domain([0,space_width]);
+    var grid = vis.append('g');
 
+    grid.selectAll("line.horizontal").data(gridScale.ticks(space_width/gridSize)).enter()
+       .append("line")
+           .attr(
+           {
+               "class":"horizontal",
+               "x1" : 0,
+               "x2" : space_width,
+               "y1" : function(d){ return gridScale(d);},
+               "y2" : function(d){ return gridScale(d);},
+               "fill" : "none",
+               "shape-rendering" : "crispEdges",
+               "stroke" : "#eee",
+               "stroke-width" : "1px"
+           });
+    grid.selectAll("line.vertical").data(gridScale.ticks(space_width/gridSize)).enter()
+       .append("line")
+           .attr(
+           {
+               "class":"vertical",
+               "y1" : 0,
+               "y2" : space_width,
+               "x1" : function(d){ return gridScale(d);},
+               "x2" : function(d){ return gridScale(d);},
+               "fill" : "none",
+               "shape-rendering" : "crispEdges",
+               "stroke" : "#eee",
+               "stroke-width" : "1px"
+           });
+    grid.style("visibility","hidden");
 
-    var drag_line = vis.append("svg:path").attr("class", "drag_line");
+    var dragGroup = vis.append('g');
+    var drag_lines = [];
+
+    function showDragLines(nodes) {
+        for (var i=0;i<nodes.length;i++) {
+            var node = nodes[i];
+            node.el = dragGroup.append("svg:path").attr("class", "drag_line");
+            drag_lines.push(node);
+        }
+    }
+    function hideDragLines() {
+        while(drag_lines.length) {
+            (drag_lines.pop()).el.remove();
+        }
+    }
 
     function updateActiveNodes() {
         var activeWorkspace = RED.workspaces.active();
@@ -3592,7 +3645,6 @@ RED.view = (function() {
             drop: function( event, ui ) {
                 d3.event = event;
                 var selected_tool = ui.draggable[0].type;
-
                 var m = /^subflow:(.+)$/.exec(selected_tool);
 
                 if (activeSubflow && m) {
@@ -3605,16 +3657,9 @@ RED.view = (function() {
                         RED.notify(RED._("notification.error",{message: RED._("notification.errors.cannotAddCircularReference")}),"error");
                         return;
                     }
-
                 }
 
-                var mousePos = d3.touches(this)[0]||d3.mouse(this);
-                mousePos[1] += this.scrollTop;
-                mousePos[0] += this.scrollLeft;
-                mousePos[1] /= scaleFactor;
-                mousePos[0] /= scaleFactor;
-
-                var nn = { id:(1+Math.random()*4294967295).toString(16),x: mousePos[0],y:mousePos[1],w:node_width,z:RED.workspaces.active()};
+                var nn = { id:(1+Math.random()*4294967295).toString(16),z:RED.workspaces.active()};
 
                 nn.type = selected_tool;
                 nn._def = RED.nodes.getType(nn.type);
@@ -3639,7 +3684,10 @@ RED.view = (function() {
                 }
 
                 nn.changed = true;
+
+                nn.w = node_width;
                 nn.h = Math.max(node_height,(nn.outputs||0) * 15);
+
                 var historyEvent = {
                     t:'add',
                     nodes:[nn.id],
@@ -3654,6 +3702,41 @@ RED.view = (function() {
                             instances: subflowRefresh.instances
                         }
                     }
+                }
+
+                var helperOffset = d3.touches(ui.helper.get(0))[0]||d3.mouse(ui.helper.get(0));
+                var mousePos = d3.touches(this)[0]||d3.mouse(this);
+
+                mousePos[1] += this.scrollTop + ((nn.h/2)-helperOffset[1]);
+                mousePos[0] += this.scrollLeft + ((nn.w/2)-helperOffset[0]);
+                mousePos[1] /= scaleFactor;
+                mousePos[0] /= scaleFactor;
+
+                if (snapGrid) {
+                    mousePos[0] = gridSize*(Math.ceil(mousePos[0]/gridSize));
+                    mousePos[1] = gridSize*(Math.ceil(mousePos[1]/gridSize));
+                }
+                nn.x = mousePos[0];
+                nn.y = mousePos[1];
+
+                var spliceLink = $(ui.helper).data('splice');
+                if (spliceLink) {
+                    // TODO: DRY - canvasMouseUp
+                    RED.nodes.removeLink(spliceLink);
+                    var link1 = {
+                        source:spliceLink.source,
+                        sourcePort:spliceLink.sourcePort,
+                        target: nn
+                    };
+                    var link2 = {
+                        source:nn,
+                        sourcePort:0,
+                        target: spliceLink.target
+                    };
+                    RED.nodes.addLink(link1);
+                    RED.nodes.addLink(link2);
+                    historyEvent.links = [link1,link2];
+                    historyEvent.removedLinks = [spliceLink];
                 }
 
                 RED.history.push(historyEvent);
@@ -3712,6 +3795,8 @@ RED.view = (function() {
     }
 
     function canvasMouseMove() {
+        var i;
+        var node;
         mouse_position = d3.touches(this)[0]||d3.mouse(this);
         // Prevent touch scrolling...
         //if (d3.touches(this)[0]) {
@@ -3758,36 +3843,73 @@ RED.view = (function() {
         var mousePos;
         if (mouse_mode == RED.state.JOINING) {
             // update drag line
-            drag_line.attr("class", "drag_line");
-            mousePos = mouse_position;
-            var numOutputs = (mousedown_port_type === 0)?(mousedown_node.outputs || 1):1;
-            var sourcePort = mousedown_port_index;
-            var portY = -((numOutputs-1)/2)*13 +13*sourcePort;
-
-            var sc = (mousedown_port_type === 0)?1:-1;
-
-            var dy = mousePos[1]-(mousedown_node.y+portY);
-            var dx = mousePos[0]-(mousedown_node.x+sc*mousedown_node.w/2);
-            var delta = Math.sqrt(dy*dy+dx*dx);
-            var scale = lineCurveScale;
-            var scaleY = 0;
-
-            if (delta < node_width) {
-                scale = 0.75-0.75*((node_width-delta)/node_width);
-            }
-            if (dx*sc < 0) {
-                scale += 2*(Math.min(5*node_width,Math.abs(dx))/(5*node_width));
-                if (Math.abs(dy) < 3*node_height) {
-                    scaleY = ((dy>0)?0.5:-0.5)*(((3*node_height)-Math.abs(dy))/(3*node_height))*(Math.min(node_width,Math.abs(dx))/(node_width)) ;
+            if (drag_lines.length === 0) {
+                if (d3.event.shiftKey) {
+                    // Get all the wires we need to detach.
+                    var links = [];
+                    var filter;
+                    if (mousedown_port_type === 0) {
+                        filter = {
+                            source:mousedown_node,
+                            sourcePort: mousedown_port_index
+                        }
+                    } else {
+                        filter = {
+                            target: mousedown_node
+                        }
+                    }
+                    var existingLinks = RED.nodes.filterLinks(filter);
+                    for (i=0;i<existingLinks.length;i++) {
+                        var link = existingLinks[i];
+                        RED.nodes.removeLink(link);
+                        links.push({
+                            link:link,
+                            node: (mousedown_port_type===0)?link.target:link.source,
+                            port: (mousedown_port_type===0)?0:link.sourcePort,
+                            portType: (mousedown_port_type===0)?1:0
+                        })
+                    }
+                    showDragLines(links);
+                    mouse_mode = 0;
+                    updateActiveNodes();
+                    redraw();
+                    mouse_mode = RED.state.JOINING;
+                } else {
+                    showDragLines([{node:mousedown_node,port:mousedown_port_index,portType:mousedown_port_type}]);
                 }
             }
+            mousePos = mouse_position;
+            for (i=0;i<drag_lines.length;i++) {
+                var drag_line = drag_lines[i];
+                var numOutputs = (drag_line.portType === 0)?(drag_line.node.outputs || 1):1;
+                var sourcePort = drag_line.port;
+                var portY = -((numOutputs-1)/2)*13 +13*sourcePort;
 
-            drag_line.attr("d",
-                "M "+(mousedown_node.x+sc*mousedown_node.w/2)+" "+(mousedown_node.y+portY)+
-                " C "+(mousedown_node.x+sc*(mousedown_node.w/2+node_width*scale))+" "+(mousedown_node.y+portY+scaleY*node_height)+" "+
-                (mousePos[0]-sc*(scale)*node_width)+" "+(mousePos[1]-scaleY*node_height)+" "+
-                mousePos[0]+" "+mousePos[1]
-                );
+                var sc = (drag_line.portType === 0)?1:-1;
+
+                var dy = mousePos[1]-(drag_line.node.y+portY);
+                var dx = mousePos[0]-(drag_line.node.x+sc*drag_line.node.w/2);
+                var delta = Math.sqrt(dy*dy+dx*dx);
+                var scale = lineCurveScale;
+                var scaleY = 0;
+
+                if (delta < node_width) {
+                    scale = 0.75-0.75*((node_width-delta)/node_width);
+                }
+                if (dx*sc < 0) {
+                    scale += 2*(Math.min(5*node_width,Math.abs(dx))/(5*node_width));
+                    if (Math.abs(dy) < 3*node_height) {
+                        scaleY = ((dy>0)?0.5:-0.5)*(((3*node_height)-Math.abs(dy))/(3*node_height))*(Math.min(node_width,Math.abs(dx))/(node_width)) ;
+                    }
+                }
+
+                drag_line.el.attr("d",
+                    "M "+(drag_line.node.x+sc*drag_line.node.w/2)+" "+(drag_line.node.y+portY)+
+                    " C "+(drag_line.node.x+sc*(drag_line.node.w/2+node_width*scale))+" "+(drag_line.node.y+portY+scaleY*node_height)+" "+
+                    (mousePos[0]-sc*(scale)*node_width)+" "+(mousePos[1]-scaleY*node_height)+" "+
+                    mousePos[0]+" "+mousePos[1]
+                    );
+            }
             d3.event.preventDefault();
         } else if (mouse_mode == RED.state.MOVING) {
             mousePos = d3.mouse(document.body);
@@ -3798,11 +3920,17 @@ RED.view = (function() {
             if (d > 3) {
                 mouse_mode = RED.state.MOVING_ACTIVE;
                 clickElapsed = 0;
+                spliceActive = false;
+                if (moving_set.length === 1) {
+                    node = moving_set[0];
+                    spliceActive = node.n._def.inputs > 0 &&
+                                   node.n._def.outputs > 0 &&
+                                   RED.nodes.filterLinks({ source: node.n }).length === 0 &&
+                                   RED.nodes.filterLinks({ target: node.n }).length === 0;
+                }
             }
         } else if (mouse_mode == RED.state.MOVING_ACTIVE || mouse_mode == RED.state.IMPORT_DRAGGING) {
             mousePos = mouse_position;
-            var node;
-            var i;
             var minX = 0;
             var minY = 0;
             for (var n = 0; n<moving_set.length; n++) {
@@ -3824,11 +3952,11 @@ RED.view = (function() {
                     node.n.y -= minY;
                 }
             }
-            if (d3.event.shiftKey && moving_set.length > 0) {
-                var gridOffset =  [0,0];
+            if (snapGrid != d3.event.shiftKey && moving_set.length > 0) {
+                var gridOffset = [0,0];
                 node = moving_set[0];
-                gridOffset[0] = node.n.x-(20*Math.floor((node.n.x-node.n.w/2)/20)+node.n.w/2);
-                gridOffset[1] = node.n.y-(20*Math.floor(node.n.y/20));
+                gridOffset[0] = node.n.x-(gridSize*Math.floor((node.n.x-node.n.w/2)/gridSize)+node.n.w/2);
+                gridOffset[1] = node.n.y-(gridSize*Math.floor(node.n.y/gridSize));
                 if (gridOffset[0] !== 0 || gridOffset[1] !== 0) {
                     for (i = 0; i<moving_set.length; i++) {
                         node = moving_set[i];
@@ -3840,6 +3968,57 @@ RED.view = (function() {
                     }
                 }
             }
+            if (mouse_mode == RED.state.MOVING_ACTIVE && moving_set.length === 1) {
+                node = moving_set[0];
+                if (spliceActive) {
+                    if (!spliceTimer) {
+                        spliceTimer = setTimeout(function() {
+                            var nodes = [];
+                            var bestDistance = Infinity;
+                            var bestLink = null;
+                            var mouseX = mousePos[0];
+                            var mouseY = mousePos[1];
+                            if (outer[0][0].getIntersectionList) {
+                                var svgRect = outer[0][0].createSVGRect();
+                                svgRect.x = mouseX;
+                                svgRect.y = mouseY;
+                                svgRect.width = 1;
+                                svgRect.height = 1;
+                                nodes = outer[0][0].getIntersectionList(svgRect, outer[0][0]);
+                            } else {
+                                // Firefox doesn't do getIntersectionList and that
+                                // makes us sad
+                                nodes = RED.view.getLinksAtPoint(mouseX,mouseY);
+                            }
+                            for (var i=0;i<nodes.length;i++) {
+                                if (d3.select(nodes[i]).classed('link_background')) {
+                                    var length = nodes[i].getTotalLength();
+                                    for (var j=0;j<length;j+=10) {
+                                        var p = nodes[i].getPointAtLength(j);
+                                        var d2 = ((p.x-mouseX)*(p.x-mouseX))+((p.y-mouseY)*(p.y-mouseY));
+                                        if (d2 < 200 && d2 < bestDistance) {
+                                            bestDistance = d2;
+                                            bestLink = nodes[i];
+                                        }
+                                    }
+                                }
+                            }
+                            if (activeSpliceLink && activeSpliceLink !== bestLink) {
+                                d3.select(activeSpliceLink.parentNode).classed('link_splice',false);
+                            }
+                            if (bestLink) {
+                                d3.select(bestLink.parentNode).classed('link_splice',true)
+                            } else {
+                                d3.select('.link_splice').classed('link_splice',false);
+                            }
+                            activeSpliceLink = bestLink;
+                            spliceTimer = null;
+                        },100);
+                    }
+                }
+            }
+
+
         }
         if (mouse_mode !== 0) {
             redraw();
@@ -3847,8 +4026,22 @@ RED.view = (function() {
     }
 
     function canvasMouseUp() {
+        var i;
+        var historyEvent;
         if (mousedown_node && mouse_mode == RED.state.JOINING) {
-            drag_line.attr("class", "drag_line_hidden");
+            var removedLinks = [];
+            for (i=0;i<drag_lines.length;i++) {
+                if (drag_lines[i].link) {
+                    removedLinks.push(drag_lines[i].link)
+                }
+            }
+            historyEvent = {
+                t:'delete',
+                links: removedLinks,
+                dirty:RED.nodes.dirty()
+            };
+            RED.history.push(historyEvent);
+            hideDragLines();
         }
         if (lasso) {
             var x = parseInt(lasso.attr("x"));
@@ -3886,7 +4079,7 @@ RED.view = (function() {
             updateSelection();
             lasso.remove();
             lasso = null;
-        } else if (mouse_mode == RED.state.DEFAULT && mousedown_link == null && !d3.event.ctrlKey ) {
+        } else if (mouse_mode == RED.state.DEFAULT && mousedown_link == null && !d3.event.ctrlKey&& !d3.event.metaKey ) {
             clearSelection();
             updateSelection();
         }
@@ -3896,11 +4089,33 @@ RED.view = (function() {
                 for (var j=0;j<moving_set.length;j++) {
                     ns.push({n:moving_set[j].n,ox:moving_set[j].ox,oy:moving_set[j].oy});
                 }
-                RED.history.push({t:'move',nodes:ns,dirty:RED.nodes.dirty()});
+                historyEvent = {t:'move',nodes:ns,dirty:RED.nodes.dirty()};
+                if (activeSpliceLink) {
+                    // TODO: DRY - droppable
+                    var spliceLink = d3.select(activeSpliceLink).data()[0];
+                    RED.nodes.removeLink(spliceLink);
+                    var link1 = {
+                        source:spliceLink.source,
+                        sourcePort:spliceLink.sourcePort,
+                        target: moving_set[0].n
+                    };
+                    var link2 = {
+                        source:moving_set[0].n,
+                        sourcePort:0,
+                        target: spliceLink.target
+                    };
+                    RED.nodes.addLink(link1);
+                    RED.nodes.addLink(link2);
+                    historyEvent.links = [link1,link2];
+                    historyEvent.removedLinks = [spliceLink];
+                    updateActiveNodes();
+                }
+                RED.nodes.dirty(true);
+                RED.history.push(historyEvent);
             }
         }
         if (mouse_mode == RED.state.MOVING || mouse_mode == RED.state.MOVING_ACTIVE) {
-            for (var i=0;i<moving_set.length;i++) {
+            for (i=0;i<moving_set.length;i++) {
                 delete moving_set[i].ox;
                 delete moving_set[i].oy;
             }
@@ -4016,6 +4231,7 @@ RED.view = (function() {
             delete moving_set[i].oy;
         }
         RED.history.push({t:'move',nodes:ns,dirty:RED.nodes.dirty()});
+        RED.nodes.dirty(true);
     }
     function moveSelection(dx,dy) {
         var minX = 0;
@@ -4168,6 +4384,13 @@ RED.view = (function() {
         mousedown_link = null;
         mouse_mode = 0;
         mousedown_port_type = 0;
+        activeSpliceLink = null;
+        spliceActive = false;
+        d3.select('.link_splice').classed('link_splice',false);
+        if (spliceTimer) {
+            clearTimeout(spliceTimer);
+            spliceTimer = null;
+        }
     }
 
     function portMouseDown(d,portType,portIndex) {
@@ -4184,46 +4407,59 @@ RED.view = (function() {
     }
 
     function portMouseUp(d,portType,portIndex) {
+        var i;
         document.body.style.cursor = "";
-        if (mouse_mode == RED.state.JOINING && mousedown_node) {
+        if (mouse_mode == RED.state.JOINING && drag_lines.length > 0) {
             if (typeof TouchEvent != "undefined" && d3.event instanceof TouchEvent) {
                 RED.nodes.eachNode(function(n) {
-                        if (n.z == RED.workspaces.active()) {
-                            var hw = n.w/2;
-                            var hh = n.h/2;
-                            if (n.x-hw<mouse_position[0] && n.x+hw> mouse_position[0] &&
-                                n.y-hh<mouse_position[1] && n.y+hh>mouse_position[1]) {
-                                    mouseup_node = n;
-                                    portType = mouseup_node.inputs>0?1:0;
-                                    portIndex = 0;
-                            }
+                    if (n.z == RED.workspaces.active()) {
+                        var hw = n.w/2;
+                        var hh = n.h/2;
+                        if (n.x-hw<mouse_position[0] && n.x+hw> mouse_position[0] &&
+                            n.y-hh<mouse_position[1] && n.y+hh>mouse_position[1]) {
+                                mouseup_node = n;
+                                portType = mouseup_node.inputs>0?1:0;
+                                portIndex = 0;
                         }
+                    }
                 });
             } else {
                 mouseup_node = d;
             }
-            if (portType == mousedown_port_type || mouseup_node === mousedown_node) {
-                drag_line.attr("class", "drag_line_hidden");
-                resetMouseVars();
-                return;
+            var addedLinks = [];
+            var removedLinks = [];
+
+            for (i=0;i<drag_lines.length;i++) {
+                if (drag_lines[i].link) {
+                    removedLinks.push(drag_lines[i].link)
+                }
             }
-            var src,dst,src_port;
-            if (mousedown_port_type === 0) {
-                src = mousedown_node;
-                src_port = mousedown_port_index;
-                dst = mouseup_node;
-            } else if (mousedown_port_type == 1) {
-                src = mouseup_node;
-                dst = mousedown_node;
-                src_port = portIndex;
+            for (i=0;i<drag_lines.length;i++) {
+                if (portType != drag_lines[i].portType && mouseup_node !== drag_lines[i].node) {
+                    var drag_line = drag_lines[i];
+                    var src,dst,src_port;
+                    if (drag_line.portType === 0) {
+                        src = drag_line.node;
+                        src_port = drag_line.port;
+                        dst = mouseup_node;
+                    } else if (drag_line.portType == 1) {
+                        src = mouseup_node;
+                        dst = drag_line.node;
+                        src_port = portIndex;
+                    }
+                    var existingLink = RED.nodes.filterLinks({source:src,target:dst,sourcePort: src_port}).length !== 0;
+                    if (!existingLink) {
+                        var link = {source: src, sourcePort:src_port, target: dst};
+                        RED.nodes.addLink(link);
+                        addedLinks.push(link);
+                    }
+                }
             }
-            var existingLink = RED.nodes.filterLinks({source:src,target:dst,sourcePort: src_port}).length !== 0;
-            if (!existingLink) {
-                var link = {source: src, sourcePort:src_port, target: dst};
-                RED.nodes.addLink(link);
+            if (addedLinks.length > 0 || removedLinks.length > 0) {
                 var historyEvent = {
                     t:'add',
-                    links:[link],
+                    links:addedLinks,
+                    removedLinks: removedLinks,
                     dirty:RED.nodes.dirty()
                 };
                 if (activeSubflow) {
@@ -4239,8 +4475,9 @@ RED.view = (function() {
                 RED.history.push(historyEvent);
                 updateActiveNodes();
                 RED.nodes.dirty(true);
-            } else {
             }
+            resetMouseVars();
+            hideDragLines();
             selected_link = null;
             redraw();
         }
@@ -4286,10 +4523,10 @@ RED.view = (function() {
 
         var i;
 
-        if (d.selected && d3.event.ctrlKey) {
-            d.selected = false;
+        if (d.selected && (d3.event.ctrlKey||d3.event.metaKey)) {
+            mousedown_node.selected = false;
             for (i=0;i<moving_set.length;i+=1) {
-                if (moving_set[i].n === d) {
+                if (moving_set[i].n === mousedown_node) {
                     moving_set.splice(i,1);
                     break;
                 }
@@ -4304,7 +4541,7 @@ RED.view = (function() {
                     moving_set.push({n:cnodes[n]});
                 }
             } else if (!d.selected) {
-                if (!d3.event.ctrlKey) {
+                if (!d3.event.ctrlKey && !d3.event.metaKey) {
                     clearSelection();
                 }
                 mousedown_node.selected = true;
@@ -4415,7 +4652,7 @@ RED.view = (function() {
                     .on("touchstart", function(d,i){portMouseDown(d,1,0);} )
                     .on("mouseup", function(d,i){portMouseUp(d,1,0);})
                     .on("touchend",function(d,i){portMouseUp(d,1,0);} )
-                    .on("mouseover",function(d,i) { var port = d3.select(this); port.classed("port_hovered",(mouse_mode!=RED.state.JOINING || mousedown_port_type !== 0 ));})
+                    .on("mouseover",function(d,i) { var port = d3.select(this); port.classed("port_hovered",(mouse_mode!=RED.state.JOINING || (drag_lines.length > 0 && drag_lines[0].portType !== 1)));})
                     .on("mouseout",function(d,i) { var port = d3.select(this); port.classed("port_hovered",false);});
 
                 outGroup.append("svg:text").attr('class','port_label').attr('x',20).attr('y',8).style("font-size","10px").text("output");
@@ -4458,7 +4695,7 @@ RED.view = (function() {
                     .on("touchstart", function(d,i){portMouseDown(d,0,i);} )
                     .on("mouseup", function(d,i){portMouseUp(d,0,i);})
                     .on("touchend",function(d,i){portMouseUp(d,0,i);} )
-                    .on("mouseover",function(d,i) { var port = d3.select(this); port.classed("port_hovered",(mouse_mode!=RED.state.JOINING || mousedown_port_type !== 0 ));})
+                    .on("mouseover",function(d,i) { var port = d3.select(this); port.classed("port_hovered",(mouse_mode!=RED.state.JOINING || (drag_lines.length > 0 && drag_lines[0].portType !== 0) ));})
                     .on("mouseout",function(d,i) { var port = d3.select(this); port.classed("port_hovered",false);});
                 inGroup.append("svg:text").attr('class','port_label').attr('x',18).attr('y',20).style("font-size","10px").text("input");
 
@@ -4497,7 +4734,7 @@ RED.view = (function() {
                     node.attr("id",d.id);
                     var l = d._def.label;
                     l = (typeof l === "function" ? l.call(d) : l)||"";
-                    d.w = Math.max(node_width,calculateTextWidth(l, "node_label", 50)+(d._def.inputs>0?7:0) );
+                    d.w = Math.max(node_width,gridSize*(Math.ceil((calculateTextWidth(l, "node_label", 50)+(d._def.inputs>0?7:0))/gridSize)) );
                     d.h = Math.max(node_height,(d.outputs||0) * 15);
 
                     if (d._def.badge) {
@@ -4680,8 +4917,10 @@ RED.view = (function() {
                         if (d.resize) {
                             var l = d._def.label;
                             l = (typeof l === "function" ? l.call(d) : l)||"";
-                            d.w = Math.max(node_width,calculateTextWidth(l, "node_label", 50)+(d._def.inputs>0?7:0) );
+                            var ow = d.w;
+                            d.w = Math.max(node_width,gridSize*(Math.ceil((calculateTextWidth(l, "node_label", 50)+(d._def.inputs>0?7:0))/gridSize)) );
                             d.h = Math.max(node_height,(d.outputs||0) * 15);
+                            d.x += (d.w-ow)/2;
                             d.resize = false;
                         }
                         var thisNode = d3.select(this);
@@ -4715,7 +4954,7 @@ RED.view = (function() {
                                     .on("touchstart",function(d){portMouseDown(d,1,0);})
                                     .on("mouseup",function(d){portMouseUp(d,1,0);} )
                                     .on("touchend",function(d){portMouseUp(d,1,0);} )
-                                    .on("mouseover",function(d) { var port = d3.select(this); port.classed("port_hovered",(mouse_mode!=RED.state.JOINING || mousedown_port_type != 1 ));})
+                                    .on("mouseover",function(d) { var port = d3.select(this); port.classed("port_hovered",(mouse_mode!=RED.state.JOINING || (drag_lines.length > 0 && drag_lines[0].portType !== 1) ));})
                                     .on("mouseout",function(d) { var port = d3.select(this); port.classed("port_hovered",false);})
                             }
 
@@ -4730,7 +4969,7 @@ RED.view = (function() {
                                 .on("touchstart",(function(){var node = d; return function(d,i){portMouseDown(node,0,i);}})() )
                                 .on("mouseup",(function(){var node = d; return function(d,i){portMouseUp(node,0,i);}})() )
                                 .on("touchend",(function(){var node = d; return function(d,i){portMouseUp(node,0,i);}})() )
-                                .on("mouseover",function(d,i) { var port = d3.select(this); port.classed("port_hovered",(mouse_mode!=RED.state.JOINING || mousedown_port_type !== 0 ));})
+                                .on("mouseover",function(d,i) { var port = d3.select(this); port.classed("port_hovered",(mouse_mode!=RED.state.JOINING || (drag_lines.length > 0 && drag_lines[0].portType !== 0) ));})
                                 .on("mouseout",function(d,i) { var port = d3.select(this); port.classed("port_hovered",false);});
 
                             d._ports.exit().remove();
@@ -4910,7 +5149,7 @@ RED.view = (function() {
                             touchStartTime = null;
                             showTouchMenu(obj,pos);
                         },touchLongPressTimeout);
-                    });
+                    })
                 l.append("svg:path").attr("class","link_outline link_path");
                 l.append("svg:path").attr("class","link_line link_path")
                     .classed("link_subflow", function(d) { return activeSubflow && (d.source.type === "subflow" || d.target.type === "subflow") });
@@ -5136,6 +5375,31 @@ RED.view = (function() {
                 selection.link = selected_link;
             }
             return selection;
+        },
+        toggleShowGrid: function(state) {
+            if (state) {
+                grid.style("visibility","visible");
+            } else {
+                grid.style("visibility","hidden");
+            }
+        },
+        toggleSnapGrid: function(state) {
+            snapGrid = state;
+            redraw();
+        },
+        scale: function() {
+            return scaleFactor;
+        },
+        getLinksAtPoint: function(x,y) {
+            var result = [];
+            var links = outer.selectAll(".link_background")[0];
+            for (var i=0;i<links.length;i++) {
+                var bb = links[i].getBBox();
+                if (x >= bb.x && y >= bb.y && x <= bb.x+bb.width && y <= bb.y+bb.height) {
+                    result.push(links[i])
+                }
+            }
+            return result;
         }
     };
 })();
@@ -5161,10 +5425,14 @@ RED.sidebar = (function() {
         id:"sidebar-tabs",
         onchange:function(tab) {
             $("#sidebar-content").children().hide();
+            $("#sidebar-footer").children().hide();
             if (tab.onchange) {
                 tab.onchange.call(tab);
             }
             $(tab.content).show();
+            if (tab.toolbar) {
+                $(tab.toolbar).show();
+            }
         },
         onremove: function(tab) {
             $(tab.content).hide();
@@ -5199,10 +5467,15 @@ RED.sidebar = (function() {
 
         $("#sidebar-content").append(options.content);
         $(options.content).hide();
+        if (options.toolbar) {
+            $("#sidebar-footer").append(options.toolbar);
+            $(options.toolbar).hide();
+        }
+        $(options.content).hide();
         var id = options.id;
 
-        RED.menu.addItem("menu-item-sidebar-menu",{
-            id:"menu-item-sidebar-menu-"+options.id,
+        RED.menu.addItem("menu-item-view-menu",{
+            id:"menu-item-view-menu-"+options.id,
             label:options.name,
             onselect:function() {
                 showSidebar(options.id);
@@ -5221,7 +5494,7 @@ RED.sidebar = (function() {
         sidebar_tabs.removeTab(id);
         $(knownTabs[id].content).remove();
         delete knownTabs[id];
-        RED.menu.removeItem("menu-item-sidebar-menu-"+id);
+        RED.menu.removeItem("menu-item-view-menu-"+id);
     }
 
     var sidebarSeparator =  {};
@@ -5345,7 +5618,7 @@ RED.sidebar = (function() {
 
 })();
 ;/**
- * Copyright 2013, 2015 IBM Corp.
+ * Copyright 2013, 2016 IBM Corp.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -5556,12 +5829,83 @@ RED.palette = (function() {
                 var help = '<div class="node-help">'+helpText+"</div>";
                 RED.sidebar.info.set(help);
             });
+            var chart = $("#chart");
+            var chartOffset = chart.offset();
+            var chartSVG = $("#chart>svg").get(0);
+            var activeSpliceLink;
+            var mouseX;
+            var mouseY;
+            var spliceTimer;
             $(d).draggable({
                 helper: 'clone',
                 appendTo: 'body',
                 revert: true,
                 revertDuration: 50,
-                start: function() {RED.view.focus();}
+                start: function() {RED.view.focus();},
+                stop: function() { d3.select('.link_splice').classed('link_splice',false); if (spliceTimer) { clearTimeout(spliceTimer); spliceTimer = null;}},
+                drag: function(e,ui) {
+                    // TODO: this is the margin-left of palette node. Hard coding
+                    // it here makes me sad
+                    ui.position.left += 17.5;
+                    if (def.inputs > 0 && def.outputs > 0) {
+                        mouseX = e.clientX - chartOffset.left+chart.scrollLeft();
+                        mouseY = e.clientY-chartOffset.top +chart.scrollTop();
+
+                        if (!spliceTimer) {
+                            spliceTimer = setTimeout(function() {
+                                var nodes = [];
+                                var bestDistance = Infinity;
+                                var bestLink = null;
+                                if (chartSVG.getIntersectionList) {
+                                    var svgRect = chartSVG.createSVGRect();
+                                    svgRect.x = mouseX;
+                                    svgRect.y = mouseY;
+                                    svgRect.width = 1;
+                                    svgRect.height = 1;
+                                    nodes = chartSVG.getIntersectionList(svgRect,chartSVG);
+                                    mouseX /= RED.view.scale();
+                                    mouseY /= RED.view.scale();
+                                } else {
+                                    // Firefox doesn't do getIntersectionList and that
+                                    // makes us sad
+                                    mouseX /= RED.view.scale();
+                                    mouseY /= RED.view.scale();
+                                    nodes = RED.view.getLinksAtPoint(mouseX,mouseY);
+                                }
+                                for (var i=0;i<nodes.length;i++) {
+                                    if (d3.select(nodes[i]).classed('link_background')) {
+                                        var length = nodes[i].getTotalLength();
+                                        for (var j=0;j<length;j+=10) {
+                                            var p = nodes[i].getPointAtLength(j);
+                                            var d2 = ((p.x-mouseX)*(p.x-mouseX))+((p.y-mouseY)*(p.y-mouseY));
+                                            if (d2 < 200 && d2 < bestDistance) {
+                                                bestDistance = d2;
+                                                bestLink = nodes[i];
+                                            }
+                                        }
+                                    }
+                                }
+                                if (activeSpliceLink && activeSpliceLink !== bestLink) {
+                                    d3.select(activeSpliceLink.parentNode).classed('link_splice',false);
+                                }
+                                if (bestLink) {
+                                    d3.select(bestLink.parentNode).classed('link_splice',true)
+                                } else {
+                                    d3.select('.link_splice').classed('link_splice',false);
+                                }
+                                if (activeSpliceLink !== bestLink) {
+                                    if (bestLink) {
+                                        $(ui.helper).data('splice',d3.select(bestLink).data()[0]);
+                                    } else {
+                                        $(ui.helper).removeData('splice');
+                                    }
+                                }
+                                activeSpliceLink = bestLink;
+                                spliceTimer = null;
+                            },200);
+                        }
+                    }
+                }
             });
 
             var nodeInfo = null;
@@ -5638,7 +5982,7 @@ RED.palette = (function() {
         }
 
         var re = new RegExp(val,'i');
-        $(".palette_node").each(function(i,el) {
+        $("#palette-container .palette_node").each(function(i,el) {
             var currentLabel = $(el).find(".palette_label").text();
             if (val === "" || re.test(el.id) || re.test(currentLabel)) {
                 $(this).show();
@@ -5930,7 +6274,7 @@ RED.sidebar.info = (function() {
     }
 })();
 ;/**
- * Copyright 2013, 2015 IBM Corp.
+ * Copyright 2013, 2016 IBM Corp.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -5950,24 +6294,115 @@ RED.sidebar.config = (function() {
     var content = document.createElement("div");
     content.className = "sidebar-node-config"
 
-    $('<div class="palette-category">'+
-      '<div class="workspace-config-node-tray-header palette-header"><i class="fa fa-angle-down expanded"></i><span data-i18n="sidebar.config.local"></span></div>'+
-    '<ul id="workspace-config-node-tray-locals" class="palette-content config-node-list"></ul>'+
-    '</div>'+
-    '<div class="palette-category">'+
-        '<div class="workspace-config-node-tray-header palette-header"><i class="fa fa-angle-down expanded"></i><span data-i18n="sidebar.config.global"></span></div>'+
-        '<ul id="workspace-config-node-tray-globals" class="palette-content config-node-list"></ul>'+
-    '</div>').appendTo(content);
+    $('<div class="button-group sidebar-header">'+
+      '<a class="sidebar-header-button selected" id="workspace-config-node-filter-all" href="#"><span data-i18n="sidebar.config.filterAll"></span></a>'+
+      '<a class="sidebar-header-button" id="workspace-config-node-filter-unused" href="#"><span data-i18n="sidebar.config.filterUnused"></span></a> '+
+      '</div>'
+    ).appendTo(content);
 
-    function createConfigNodeList(nodes,list) {
+
+    var toolbar = $('<div>'+
+        '<a class="sidebar-footer-button" id="workspace-config-node-collapse-all" href="#"><i class="fa fa-angle-double-up"></i></a> '+
+        '<a class="sidebar-footer-button" id="workspace-config-node-expand-all" href="#"><i class="fa fa-angle-double-down"></i></a>'+
+        '</div>');
+
+    var globalCategories = $("<div>").appendTo(content);
+    var flowCategories = $("<div>").appendTo(content);
+    var subflowCategories = $("<div>").appendTo(content);
+
+    var showUnusedOnly = false;
+
+    var categories = {};
+
+    function getOrCreateCategory(name,parent,label) {
+        name = name.replace(/\./i,"-");
+        if (!categories[name]) {
+            var container = $('<div class="palette-category workspace-config-node-category" id="workspace-config-node-category-'+name+'"></div>').appendTo(parent);
+            var header = $('<div class="workspace-config-node-tray-header palette-header"><i class="fa fa-angle-down expanded"></i></div>').appendTo(container);
+            if (label) {
+                $('<span class="config-node-label"/>').text(label).appendTo(header);
+            } else {
+                $('<span class="config-node-label" data-i18n="sidebar.config.'+name+'">').appendTo(header);
+            }
+            $('<span class="config-node-filter-info"></span>').appendTo(header);
+            category = $('<ul class="palette-content config-node-list"></ul>').appendTo(container);
+            container.i18n();
+            var icon = header.find("i");
+            var result = {
+                label: label,
+                list: category,
+                size: function() {
+                    return result.list.find("li:not(.config_node_none)").length
+                },
+                open: function(snap) {
+                    if (!icon.hasClass("expanded")) {
+                        icon.addClass("expanded");
+                        if (snap) {
+                            result.list.show();
+                        } else {
+                            result.list.slideDown();
+                        }
+                    }
+                },
+                close: function(snap) {
+                    if (icon.hasClass("expanded")) {
+                        icon.removeClass("expanded");
+                        if (snap) {
+                            result.list.hide();
+                        } else {
+                            result.list.slideUp();
+                        }
+                    }
+                },
+                isOpen: function() {
+                    return icon.hasClass("expanded");
+                }
+            };
+
+            header.on('click', function(e) {
+                if (result.isOpen()) {
+                    result.close();
+                } else {
+                    result.open();
+                }
+            });
+            categories[name] = result;
+        } else {
+            if (categories[name].label !== label) {
+                categories[name].list.parent().find('.config-node-label').text(label);
+                categories[name].label = label;
+            }
+        }
+        return categories[name];
+    }
+
+    function createConfigNodeList(id,nodes) {
+        var category = getOrCreateCategory(id.replace(/\./i,"-"))
+        var list = category.list;
+
         nodes.sort(function(A,B) {
             if (A.type < B.type) { return -1;}
             if (A.type > B.type) { return 1;}
             return 0;
         });
+        if (showUnusedOnly) {
+            var hiddenCount = nodes.length;
+            nodes = nodes.filter(function(n) {
+                return n.users.length === 0;
+            })
+            hiddenCount = hiddenCount - nodes.length;
+            if (hiddenCount > 0) {
+                list.parent().find('.config-node-filter-info').text(RED._('sidebar.config.filtered',{count:hiddenCount})).show();
+            } else {
+                list.parent().find('.config-node-filter-info').hide();
+            }
+        } else {
+            list.parent().find('.config-node-filter-info').hide();
+        }
         list.empty();
         if (nodes.length === 0) {
             $('<li class="config_node_none" data-i18n="sidebar.config.none">NONE</li>').i18n().appendTo(list);
+            category.close(true);
         } else {
             var currentType = "";
             nodes.forEach(function(node) {
@@ -6017,23 +6452,46 @@ RED.sidebar.config = (function() {
                     RED.view.redraw();
                 });
             });
+            category.open(true);
         }
     }
 
     function refreshConfigNodeList() {
+        var validList = {"global":true};
 
-        var localConfigNodes = [];
+        getOrCreateCategory("global",globalCategories);
+
+        RED.nodes.eachWorkspace(function(ws) {
+            validList[ws.id.replace(/\./g,"-")] = true;
+            getOrCreateCategory(ws.id,flowCategories,ws.label);
+        })
+        RED.nodes.eachSubflow(function(sf) {
+            validList[sf.id.replace(/\./g,"-")] = true;
+            getOrCreateCategory(sf.id,subflowCategories,sf.name);
+        })
+        $(".workspace-config-node-category").each(function() {
+            var id = $(this).attr('id').substring("workspace-config-node-category-".length);
+            if (!validList[id]) {
+                $(this).remove();
+                delete categories[id];
+            }
+        })
         var globalConfigNodes = [];
-
+        var configList = {};
         RED.nodes.eachConfig(function(cn) {
-            if (cn.z == RED.workspaces.active()) {
-                localConfigNodes.push(cn);
+            if (cn.z) {//} == RED.workspaces.active()) {
+                configList[cn.z.replace(/\./g,"-")] = configList[cn.z.replace(/\./g,"-")]||[];
+                configList[cn.z.replace(/\./g,"-")].push(cn);
             } else if (!cn.z) {
                 globalConfigNodes.push(cn);
             }
         });
-        createConfigNodeList(localConfigNodes,$("#workspace-config-node-tray-locals"));
-        createConfigNodeList(globalConfigNodes,$("#workspace-config-node-tray-globals"));
+        for (var id in validList) {
+            if (validList.hasOwnProperty(id)) {
+                createConfigNodeList(id,configList[id]||[]);
+            }
+        }
+        createConfigNodeList('global',globalConfigNodes);
     }
 
     function init() {
@@ -6042,25 +6500,63 @@ RED.sidebar.config = (function() {
             label: RED._("sidebar.config.label"),
             name: RED._("sidebar.config.name"),
             content: content,
+            toolbar: toolbar,
             closeable: true,
             visible: false,
             onchange: function() { refreshConfigNodeList(); }
         });
 
-        $(".workspace-config-node-tray-header").on('click', function(e) {
-            var icon = $(this).find("i");
-            if (icon.hasClass("expanded")) {
-                icon.removeClass("expanded");
-                $(this).next().slideUp();
-            } else {
-                icon.addClass("expanded");
-                $(this).next().slideDown();
-            }
+        RED.menu.setAction('menu-item-config-nodes',function() {
+            RED.sidebar.show('config');
+        })
 
+        $("#workspace-config-node-collapse-all").on("click", function(e) {
+            e.preventDefault();
+            for (var cat in categories) {
+                if (categories.hasOwnProperty(cat)) {
+                    categories[cat].close();
+                }
+            }
+        });
+        $("#workspace-config-node-expand-all").on("click", function(e) {
+            e.preventDefault();
+            for (var cat in categories) {
+                if (categories.hasOwnProperty(cat)) {
+                    if (categories[cat].size() > 0) {
+                        categories[cat].open();
+                    }
+                }
+            }
+        });
+        $('#workspace-config-node-filter-all').on("click",function(e) {
+            e.preventDefault();
+            if (showUnusedOnly) {
+                $(this).addClass('selected');
+                $('#workspace-config-node-filter-unused').removeClass('selected');
+                showUnusedOnly = !showUnusedOnly;
+                refreshConfigNodeList();
+            }
+        });
+        $('#workspace-config-node-filter-unused').on("click",function(e) {
+            e.preventDefault();
+            if (!showUnusedOnly) {
+                $(this).addClass('selected');
+                $('#workspace-config-node-filter-all').removeClass('selected');
+                showUnusedOnly = !showUnusedOnly;
+                refreshConfigNodeList();
+            }
         });
 
+
     }
-    function show() {
+    function show(unused) {
+        if (unused !== undefined) {
+            if (unused) {
+                $('#workspace-config-node-filter-unused').click();
+            } else {
+                $('#workspace-config-node-filter-all').click();
+            }
+        }
         refreshConfigNodeList();
         RED.sidebar.show("config");
     }
@@ -6222,9 +6718,9 @@ RED.editor = (function() {
                     node.ports.pop();
                 }
                 RED.nodes.eachLink(function(l) {
-                        if (l.source === node && l.sourcePort >= node.outputs) {
-                            removedLinks.push(l);
-                        }
+                    if (l.source === node && l.sourcePort >= node.outputs) {
+                        removedLinks.push(l);
+                    }
                 });
             } else if (node.outputs > node.ports.length) {
                 while (node.outputs > node.ports.length) {
@@ -6377,23 +6873,7 @@ RED.editor = (function() {
                                 }
                                 editing_node.dirty = true;
                                 validateNode(editing_node);
-                                RED.view.redraw();
-                            } else if (/Export nodes to library/.test($( "#dialog" ).dialog("option","title"))) {
-                                //TODO: move this to RED.library
-                                var flowName = $("#node-input-filename").val();
-                                if (!/^\s*$/.test(flowName)) {
-                                    $.ajax({
-                                        url:'library/flows/'+flowName,
-                                        type: "POST",
-                                        data: $("#node-input-filename").attr('nodes'),
-                                        contentType: "application/json; charset=utf-8"
-                                    }).done(function() {
-                                            RED.library.loadFlowLibrary();
-                                            RED.notify(RED._("library.savedNodes"),"success");
-                                    }).fail(function(xhr,textStatus,err) {
-                                        RED.notify(RED._("library.saveFailed",{message:xhr.responseText}),"error");
-                                    });
-                                }
+                                RED.view.redraw(true);
                             }
                             $( this ).dialog( "close" );
                         }
@@ -6436,6 +6916,10 @@ RED.editor = (function() {
                 resize: function(e,ui) {
                     if (editing_node) {
                         $(this).dialog('option',"sizeCache-"+editing_node.type,ui.size);
+                        if (editing_node._def.oneditresize) {
+                            var form = $("#dialog-form");
+                            editing_node._def.oneditresize.call(editing_node,{width:form.width(),height:form.height()});
+                        }
                     }
                 },
                 open: function(e) {
@@ -6451,6 +6935,12 @@ RED.editor = (function() {
                         if (size) {
                             $(this).dialog('option','width',size.width);
                             $(this).dialog('option','height',size.height);
+                        }
+                        if (editing_node._def.oneditresize) {
+                            setTimeout(function() {
+                                var form = $("#dialog-form");
+                                editing_node._def.oneditresize.call(editing_node,{width:form.width(),height:form.height()});
+                            },0);
                         }
                     }
                 },
@@ -6473,6 +6963,12 @@ RED.editor = (function() {
                     }
                     editing_node = null;
                 }
+        }).parent().on('keydown', function(evt) {
+            if (evt.keyCode === $.ui.keyCode.ESCAPE && (evt.metaKey || evt.ctrlKey)) {
+                $("#node-dialog-cancel").click();
+            } else if (evt.keyCode === $.ui.keyCode.ENTER && (evt.metaKey || evt.ctrlKey)) {
+                $("#node-dialog-ok").click();
+            }
         });
     }
 
@@ -7096,6 +7592,12 @@ RED.editor = (function() {
                         cancel: '.ui-dialog-content, .ui-dialog-titlebar-close, #node-config-dialog-scope-container'
                     });
                 }
+        }).parent().on('keydown', function(evt) {
+            if (evt.keyCode === $.ui.keyCode.ESCAPE && (evt.metaKey || evt.ctrlKey)) {
+                $("#node-config-dialog-cancel").click();
+            } else if (evt.keyCode === $.ui.keyCode.ENTER && (evt.metaKey || evt.ctrlKey)) {
+                $("#node-config-dialog-ok").click();
+            }
         });
     }
 
@@ -7167,7 +7669,7 @@ RED.editor = (function() {
                                 RED.history.push(historyEvent);
                             }
                             editing_node.dirty = true;
-                            RED.view.redraw();
+                            RED.view.redraw(true);
                         }
                         $( this ).dialog( "close" );
                     }
@@ -7216,6 +7718,12 @@ RED.editor = (function() {
                 height -= (parseInt($("#subflow-dialog>form").css("marginTop"))+parseInt($("#subflow-dialog>form").css("marginBottom")));
                 $(".node-text-editor").css("height",height+"px");
                 subflowEditor.resize();
+            }
+        }).parent().on('keydown', function(evt) {
+            if (evt.keyCode === $.ui.keyCode.ESCAPE && (evt.metaKey || evt.ctrlKey)) {
+                $("#subflow-dialog-cancel").click();
+            } else if (evt.keyCode === $.ui.keyCode.ENTER && (evt.metaKey || evt.ctrlKey)) {
+                $("#subflow-dialog-ok").click();
             }
         });
     }
@@ -7306,7 +7814,7 @@ RED.clipboard = (function() {
     var exportNodesDialog;
     var importNodesDialog;
 
-    function setupDialogs(){
+    function setupDialogs() {
         dialog = $('<div id="clipboard-dialog" class="hide"><form class="dialog-form form-horizontal"></form></div>')
             .appendTo("body")
             .dialog({
@@ -7319,9 +7827,7 @@ RED.clipboard = (function() {
                         id: "clipboard-dialog-ok",
                         text: RED._("common.label.ok"),
                         click: function() {
-                            if (/Import/.test(dialog.dialog("option","title"))) {
-                                RED.view.importNodes($("#clipboard-import").val());
-                            }
+                            RED.view.importNodes($("#clipboard-import").val());
                             $( this ).dialog( "close" );
                         }
                     },
@@ -7347,7 +7853,7 @@ RED.clipboard = (function() {
                 close: function(e) {
                     RED.keyboard.enable();
                 }
-        });
+            });
 
         dialogContainer = dialog.children(".dialog-form");
 
@@ -7369,9 +7875,11 @@ RED.clipboard = (function() {
     function validateImport() {
         var importInput = $("#clipboard-import");
         var v = importInput.val();
+        v = v.substring(v.indexOf('['),v.lastIndexOf(']')+1);
         try {
             JSON.parse(v);
             importInput.removeClass("input-error");
+            importInput.val(v);
             $("#clipboard-dialog-ok").button("enable");
         } catch(err) {
             if (v !== "") {
@@ -7439,8 +7947,6 @@ RED.clipboard = (function() {
             RED.keyboard.add(/* e */ 69,{ctrl:true},function(){exportNodes();d3.event.preventDefault();});
             RED.keyboard.add(/* i */ 73,{ctrl:true},function(){importNodes();d3.event.preventDefault();});
 
-
-
             $('#chart').on("dragenter",function(event) {
                 if ($.inArray("text/plain",event.originalEvent.dataTransfer.types) != -1) {
                     $("#dropTarget").css({display:'table'});
@@ -7459,20 +7965,15 @@ RED.clipboard = (function() {
             .on("drop",function(event) {
                 var data = event.originalEvent.dataTransfer.getData("text/plain");
                 hideDropTarget();
+                data = data.substring(data.indexOf('['),data.lastIndexOf(']')+1);
                 RED.view.importNodes(data);
                 event.preventDefault();
             });
-
 
         },
         import: importNodes,
         export: exportNodes
     }
-
-
-
-
-
 })();
 ;/**
  * Copyright 2013, 2015 IBM Corp.
@@ -7491,6 +7992,8 @@ RED.clipboard = (function() {
  **/
 RED.library = (function() {
 
+
+    var exportToLibraryDialog;
 
     function loadFlowLibrary() {
         $.getJSON("library/flows",function(data) {
@@ -7858,10 +8361,8 @@ RED.library = (function() {
     function exportFlow() {
         //TODO: don't rely on the main dialog
         var nns = RED.nodes.createExportableNodeSet(RED.view.selection().nodes);
-        $("#dialog-form").html($("script[data-template-name='export-library-dialog']").html());
-        $("#node-input-filename").attr('nodes',JSON.stringify(nns));
-        $("#dialog").i18n();
-        $("#dialog").dialog("option","title",RED._("library.exportToLibrary")).dialog( "open" );
+        $("#node-input-library-filename").attr('nodes',JSON.stringify(nns));
+        exportToLibraryDialog.dialog( "open" );
     }
 
     return {
@@ -7881,6 +8382,61 @@ RED.library = (function() {
             if (RED.settings.theme("menu.menu-item-import-library") !== false) {
                 loadFlowLibrary();
             }
+
+            exportToLibraryDialog = $('<div id="library-dialog" class="hide"><form class="dialog-form form-horizontal"></form></div>')
+                .appendTo("body")
+                .dialog({
+                    modal: true,
+                    autoOpen: false,
+                    width: 500,
+                    resizable: false,
+                    title: RED._("library.exportToLibrary"),
+                    buttons: [
+                        {
+                            id: "library-dialog-ok",
+                            text: RED._("common.label.ok"),
+                            click: function() {
+                                //TODO: move this to RED.library
+                                var flowName = $("#node-input-library-filename").val();
+                                if (!/^\s*$/.test(flowName)) {
+                                    $.ajax({
+                                        url:'library/flows/'+flowName,
+                                        type: "POST",
+                                        data: $("#node-input-library-filename").attr('nodes'),
+                                        contentType: "application/json; charset=utf-8"
+                                    }).done(function() {
+                                            RED.library.loadFlowLibrary();
+                                            RED.notify(RED._("library.savedNodes"),"success");
+                                    }).fail(function(xhr,textStatus,err) {
+                                        RED.notify(RED._("library.saveFailed",{message:xhr.responseText}),"error");
+                                    });
+                                }
+                                $( this ).dialog( "close" );
+                            }
+                        },
+                        {
+                            id: "library-dialog-cancel",
+                            text: RED._("common.label.cancel"),
+                            click: function() {
+                                $( this ).dialog( "close" );
+                            }
+                        }
+                    ],
+                    open: function(e) {
+                        $(this).parent().find(".ui-dialog-titlebar-close").hide();
+                        RED.keyboard.disable();
+                    },
+                    close: function(e) {
+                        RED.keyboard.enable();
+                    }
+            });
+            exportToLibraryDialog.children(".dialog-form").append($(
+                '<div class="form-row">'+
+                '<label for="node-input-library-filename" data-i18n="[append]editor:library.filename"><i class="fa fa-file"></i> </label>'+
+                '<input type="text" id="node-input-library-filename" data-i18n="[placeholder]editor:library.fullFilenamePlaceholder">'+
+                '<input type="text" style="display: none;" />'+ // Second hidden input to prevent submit on Enter
+                '</div>'
+            ));
         },
         create: createUI,
         loadFlowLibrary: loadFlowLibrary,
@@ -7889,7 +8445,7 @@ RED.library = (function() {
     }
 })();
 ;/**
- * Copyright 2013 IBM Corp.
+ * Copyright 2013, 2016 IBM Corp.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -7939,6 +8495,13 @@ RED.notify = (function() {
             };
         })();
         if (!fixed) {
+            $(n).click((function() {
+                var nn = n;
+                return function() {
+                    nn.close();
+                    window.clearTimeout(nn.timeoutid);
+                };
+            })());
             n.timeoutid = window.setTimeout(n.close,timeout||3000);
         }
         currentNotifications.push(n);
@@ -8738,3 +9301,309 @@ RED.touch.radialMenu = (function() {
 
 })();
 
+;/**
+ * Copyright 2015 IBM Corp.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ **/
+(function($) {
+    var allOptions = {
+        msg: {value:"msg",label:"msg.",validate:/^[a-zA-Z_][a-zA-Z0-9_]*(\.[a-zA-Z_][a-zA-Z0-9_]+)*/i},
+        flow: {value:"flow",label:"flow.",validate:/^[a-zA-Z_][a-zA-Z0-9_]*(\.[a-zA-Z_][a-zA-Z0-9_]+)*/i},
+        global: {value:"global",label:"global.",validate:/^[a-zA-Z_][a-zA-Z0-9_]*(\.[a-zA-Z_][a-zA-Z0-9_]+)*/i},
+        str: {value:"str",label:"string",icon:"red/images/typedInput/az.png"},
+        num: {value:"num",label:"number",icon:"red/images/typedInput/09.png",validate:/^[+-]?[0-9]*\.?[0-9]*([eE][-+]?[0-9]+)?$/},
+        bool: {value:"bool",label:"boolean",icon:"red/images/typedInput/bool.png",options:["true","false"]},
+        json: {value:"json",label:"JSON",icon:"red/images/typedInput/json.png", validate: function(v) { try{JSON.parse(v);return true;}catch(e){return false;}}},
+        re: {value:"re",label:"regular expression",icon:"red/images/typedInput/re.png"}
+    };
+    var nlsd = false;
+
+    $.widget( "nodered.typedInput", {
+        _create: function() {
+            if (!nlsd && RED && RED._) {
+                for (var i in allOptions) {
+                    if (allOptions.hasOwnProperty(i)) {
+                        allOptions[i].label = RED._("typedInput.type."+i,{defaultValue:allOptions[i].label});
+                    }
+                }
+            }
+            nlsd = true;
+            var that = this;
+
+            this.disarmClick = false;
+            this.element.addClass('red-ui-typedInput');
+            this.uiWidth = this.element.width();
+            this.uiSelect = this.element
+                .wrap( "<div>" )
+                .parent();
+
+            ["Right","Left"].forEach(function(d) {
+                var m = that.element.css("margin"+d);
+                that.uiSelect.css("margin"+d,m);
+                that.element.css("margin"+d,0);
+            });
+            this.uiSelect.addClass("red-ui-typedInput-container");
+
+            this.options.types = this.options.types||Object.keys(allOptions);
+
+            var hasSubOptions = false;
+            this.typeMap = {};
+            this.types = this.options.types.map(function(opt) {
+                var result;
+                if (typeof opt === 'string') {
+                    result = allOptions[opt];
+                } else {
+                    result = opt;
+                }
+                that.typeMap[result.value] = result;
+                if (result.options) {
+                    hasSubOptions = true;
+                }
+                return result;
+            });
+
+            if (this.options.typeField) {
+                this.typeField = $(this.options.typeField).hide();
+                var t = this.typeField.val();
+                if (t && this.typeMap[t]) {
+                    this.options.default = t;
+                }
+            } else {
+                this.typeField = $("<input>",{type:'hidden'}).appendTo(this.uiSelect);
+            }
+
+            this.selectTrigger = $('<a href="#"><i class="fa fa-sort-desc"></i></a>').prependTo(this.uiSelect);
+            this.selectLabel = $('<span></span>').appendTo(this.selectTrigger);
+
+            this.element.on('focus', function() {
+                that.uiSelect.addClass('red-ui-typedInput-focus');
+            });
+            this.element.on('blur', function() {
+                that.uiSelect.removeClass('red-ui-typedInput-focus');
+            });
+            this.element.on('change', function() {
+                that.validate();
+            })
+
+            this.selectTrigger.click(function(event) {
+                event.preventDefault();
+                that._showMenu(that.menu,that.selectTrigger);
+            });
+
+
+            if (hasSubOptions) {
+                // explicitly set optionSelectTrigger display to inline-block otherwise jQ sets it to 'inline'
+                this.optionSelectTrigger = $('<a href="#" class="red-ui-typedInput-option-trigger" style="display:inline-block"><i class="fa fa-sort-desc"></i></a>').appendTo(this.uiSelect);
+                this.optionSelectLabel = $('<span></span>').prependTo(this.optionSelectTrigger);
+                this.optionSelectTrigger.click(function(event) {
+                    event.preventDefault();
+                    if (that.optionMenu) {
+                        that.optionMenu.css({
+                            minWidth:that.optionSelectLabel.width()
+                        });
+
+                        that._showMenu(that.optionMenu,that.optionSelectLabel)
+                    }
+                });
+            }
+            this.menu = this._createMenu(this.types, function(v) { that.type(v) });
+            this.type(this.options.default||this.types[0].value);
+        },
+        _hideMenu: function(menu) {
+            $(document).off("mousedown.close-property-select");
+            menu.hide();
+            this.element.focus();
+        },
+        _createMenu: function(opts,callback) {
+            var that = this;
+            var menu = $("<div>").addClass("red-ui-typedInput-options");
+            opts.forEach(function(opt) {
+                if (typeof opt === 'string') {
+                    opt = {value:opt,label:opt};
+                }
+                var op = $('<a href="#">').attr("value",opt.value).appendTo(menu);
+                if (opt.label) {
+                    op.text(opt.label);
+                }
+                if (opt.icon) {
+                    $('<img>',{src:opt.icon,style:"margin-right: 4px; height: 18px;"}).prependTo(op);
+                } else {
+                    op.css({paddingLeft: "18px"});
+                }
+
+                op.click(function(event) {
+                    event.preventDefault();
+                    callback(opt.value);
+                    that._hideMenu(menu);
+                });
+            });
+            menu.css({
+                display: "none",
+            });
+            menu.appendTo(document.body);
+            return menu;
+
+        },
+        _showMenu: function(menu,relativeTo) {
+            if (this.disarmClick) {
+                this.disarmClick = false;
+                return
+            }
+            var that = this;
+            var pos = relativeTo.offset();
+            var height = relativeTo.height();
+            menu.css({
+                top: (height+pos.top-3)+"px",
+                left: (2+pos.left)+"px",
+            });
+            menu.slideDown(100);
+            this._delay(function() {
+                that.uiSelect.addClass('red-ui-typedInput-focus');
+                $(document).on("mousedown.close-property-select", function(event) {
+                    if(!$(event.target).closest(menu).length) {
+                        that._hideMenu(menu);
+                    }
+                    if ($(event.target).closest(relativeTo).length) {
+                        that.disarmClick = true;
+                        event.preventDefault();
+                    }
+                })
+            });
+        },
+        _getLabelWidth: function(label) {
+            var labelWidth = label.width();
+            if (labelWidth === 0) {
+                var newTrigger = label.clone();
+                newTrigger.css({
+                    position:"absolute",
+                    top:0,
+                    left:-1000
+                }).appendTo(document.body);
+                labelWidth = newTrigger.width()+4;
+                newTrigger.remove();
+            }
+            return labelWidth;
+        },
+        _resize: function() {
+
+            if (this.typeMap[this.propertyType] && this.typeMap[this.propertyType].hasValue === false) {
+                this.selectTrigger.width(this.uiWidth+5);
+            } else {
+                this.selectTrigger.width('auto');
+                var labelWidth = this._getLabelWidth(this.selectTrigger);
+
+                var newWidth = this.uiWidth-labelWidth+4;
+                this.element.width(newWidth);
+
+                if (this.optionSelectTrigger) {
+                    var triggerWidth = this._getLabelWidth(this.optionSelectTrigger);
+                    labelWidth = this._getLabelWidth(this.optionSelectLabel)-4;
+                    this.optionSelectLabel.width(labelWidth+(newWidth-triggerWidth));
+                }
+            }
+        },
+        _destroy: function() {
+            this.menu.remove();
+        },
+        width: function(desiredWidth) {
+            this.uiWidth = desiredWidth;
+            this._resize();
+        },
+        value: function(value) {
+            if (!arguments.length) {
+                return this.element.val();
+            } else {
+                if (this.typeMap[this.propertyType].options) {
+                    if (this.typeMap[this.propertyType].options.indexOf(value) === -1) {
+                        value = "";
+                    }
+                    this.optionSelectLabel.text(value);
+                }
+                this.element.val(value);
+                this.element.trigger('change');
+            }
+        },
+        type: function(type) {
+            if (!arguments.length) {
+                return this.propertyType;
+            } else {
+                var opt = this.typeMap[type];
+                if (opt && this.propertyType !== type) {
+                    this.propertyType = type;
+                    this.typeField.val(type);
+                    this.selectLabel.empty();
+                    if (opt.icon) {
+                        $('<img>',{src:opt.icon,style:"margin-right: 4px;height: 18px;"}).prependTo(this.selectLabel);
+                    } else {
+                        this.selectLabel.text(opt.label);
+                    }
+                    if (opt.options) {
+                        if (this.optionSelectTrigger) {
+                            this.optionSelectTrigger.show();
+                            this.element.hide();
+                            var that = this;
+                            this.optionMenu = this._createMenu(opt.options,function(v){
+                                that.optionSelectLabel.text(v);
+                                that.value(v);
+                            });
+                            var currentVal = this.element.val();
+                            if (opt.options.indexOf(currentVal) !== -1) {
+                                this.optionSelectLabel.text(currentVal);
+                            } else {
+                                this.value(opt.options[0]);
+                            }
+                        }
+                    } else {
+                        if (this.optionMenu) {
+                            this.optionMenu.remove();
+                            this.optionMenu = null;
+                        }
+                        if (this.optionSelectTrigger) {
+                            this.optionSelectTrigger.hide();
+                        }
+                        if (opt.hasValue === false) {
+                            this.element.val("");
+                            this.element.hide();
+                        } else {
+                            this.element.show();
+                        }
+                        this.element.trigger('change');
+                    }
+                    this._resize();
+                }
+            }
+        },
+        validate: function() {
+            var result;
+            var value = this.value();
+            var type = this.type();
+            if (this.typeMap[type] && this.typeMap[type].validate) {
+                var val = this.typeMap[type].validate;
+                if (typeof val === 'function') {
+                    result = val(value);
+                } else {
+                    result = val.test(value);
+                }
+            } else {
+                result = true;
+            }
+            if (result) {
+                this.uiSelect.removeClass('input-error');
+            } else {
+                this.uiSelect.addClass('input-error');
+            }
+            return result;
+        }
+    });
+})(jQuery);
