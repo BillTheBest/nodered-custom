@@ -40,17 +40,17 @@ var themeSettings = null;
 
 function serveFile(app,baseUrl,file) {
 
-  try {
-    var url = baseUrl+path.basename(file);
-    //console.log(url,"->",file);
-    app.get(url,function(req, res) {
-      res.sendFile(file);
-    });
-    return "../public"+url;
-  } catch(err) {
-    //TODO: log filenotfound
-    return null;
-  }
+    try {
+        var url = baseUrl+path.basename(file);
+        //console.log(url,"->",file);
+        app.get(url,function(req, res) {
+            res.sendFile(file);
+        });
+        return "../public"+url;
+    } catch(err) {
+        //TODO: log filenotfound
+        return null;
+    }
 }
 
 module.exports = {
