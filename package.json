@@ -1,6 +1,6 @@
 {
   "name"         : "node-red-custom",
-  "version"      : "0.13.3",
+  "version"      : "0.13.3a",
   "description"  : "little bit customized node-red",
   "repository"   : {
     "type":"git",
